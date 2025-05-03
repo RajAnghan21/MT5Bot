@@ -1,8 +1,4 @@
 TELEGRAM_BOT_TOKEN = 'YOUR_BOT_TOKEN'
 ALLOWED_USERS_FILE = 'allowed_users.json'
 EMA_PERIOD = 21
-PAIR_LIST = [
-    "EUR/USD", "GBP/USD", "USD/JPY",
-    "USD/CHF", "AUD/USD", "USD/CAD",
-    "NZD/USD", "EUR/JPY", "GBP/JPY"
-]
+LOG_TO_TERMINAL = True

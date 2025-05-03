@@ -1,4 +1,5 @@
 import asyncio, json
+import os, sys, subprocess
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
@@ -6,11 +7,10 @@ from aiogram.types import Message
 from aiogram.filters import Command
 from config import TELEGRAM_BOT_TOKEN, ALLOWED_USERS_FILE
 from pair_state import monitor_pair, active_monitors
-from photo_handler import router as photo_router
+from photo_handler import ask_for_photo, handle_photo, handle_photo_action
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
-dp.include_router(photo_router)
 
 def load_users():
     with open(ALLOWED_USERS_FILE) as f:
@@ -18,13 +18,13 @@ def load_users():
 
 @dp.message(Command("start"))
 async def cmd_start(msg: Message):
-    await msg.answer("Welcome! Use /available, /status, /usage, /clear or /photos.")
+    await msg.answer("Welcome! Use /available, /status, /clear, /usage.")
 
 @dp.message(Command("available"))
 async def cmd_available(msg: Message):
     if msg.from_user.id not in load_users():
         return await msg.answer("Not allowed.")
-    await msg.answer("Send one or more pairs (comma-separated), e.g.: EUR/USD, GBP/JPY")
+    await msg.answer("Send one or more pairs (comma-separated), e.g.: EURUSD, GBPJPY")
 
 @dp.message(Command("clear"))
 async def cmd_clear(msg: Message):
@@ -61,7 +61,17 @@ async def handle_input(msg: Message):
         await msg.answer(f"Monitoring {pair}...")
         asyncio.create_task(monitor_pair(bot, uid, pair))
 
+async def auto_update_and_restart():
+    while True:
+        process = subprocess.run(["git", "pull"], capture_output=True, text=True)
+        if "Already up to date" not in process.stdout:
+            print("Update detected. Restarting bot...")
+            await bot.session.close()
+            os.execv(sys.executable, ['python'] + sys.argv)
+        await asyncio.sleep(60)
+
 async def main():
+    asyncio.create_task(auto_update_and_restart())
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
