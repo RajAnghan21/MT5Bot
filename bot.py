@@ -80,7 +80,7 @@ async def auto_update_and_restart():
             print("Update detected. Restarting bot...")
             await bot.session.close()
             os.execv(sys.executable, ['python'] + sys.argv)
-        await asyncio.sleep(60)
+        await asyncio.sleep(1)  # Check every 1 second
 
 async def main():
     asyncio.create_task(auto_update_and_restart())
