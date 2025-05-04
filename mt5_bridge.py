@@ -1,9 +1,10 @@
 import MetaTrader5 as mt5
 from datetime import datetime
+from config import MT5_LOGIN, MT5_PASSWORD, MT5_SERVER
 
 def fetch_mt5_candles(symbol, interval):
-    if not mt5.initialize():
-        print(f"[{symbol}] ❌ MT5 not initialized:", mt5.last_error())
+    if not mt5.initialize(login=MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
+        print(f"[{symbol}] ❌ MT5 login failed: {mt5.last_error()}")
         return []
 
     tf = mt5.TIMEFRAME_M1 if interval == "1min" else mt5.TIMEFRAME_M5

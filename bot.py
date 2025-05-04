@@ -51,8 +51,20 @@ async def cmd_status(msg: Message):
     else:
         await msg.answer("No pairs monitored.")
 
+@dp.message(Command("photos"))
+async def photo_command(msg: Message):
+    await ask_for_photo(msg)
+
+@dp.message(F.photo)
+async def photo_received(msg: Message):
+    await handle_photo(msg)
+
+@dp.callback_query(F.data.in_(["photo_add", "photo_cancel"]))
+async def photo_response(cb: Message):
+    await handle_photo_action(cb)
+
 @dp.message(F.text)
-async def handle_input(msg: Message):
+async def handle_pair_input(msg: Message):
     uid = msg.from_user.id
     if uid not in load_users():
         return await msg.answer("Not allowed.")

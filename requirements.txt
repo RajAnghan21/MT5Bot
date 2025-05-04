@@ -1,0 +1,4 @@
+aiogram==3.3.0
+MetaTrader5
+pillow
+pytesseract
