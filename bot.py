@@ -1,15 +1,13 @@
-import asyncio, json
-import os, sys, subprocess
+import asyncio, json, os, sys, subprocess
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ParseMode
-from aiogram.client.default import DefaultBotProperties
 from aiogram.types import Message
 from aiogram.filters import Command
 from config import TELEGRAM_BOT_TOKEN, ALLOWED_USERS_FILE
 from pair_state import monitor_pair, active_monitors
 from photo_handler import ask_for_photo, handle_photo, handle_photo_action
 
-bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+bot = Bot(token=TELEGRAM_BOT_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
 def load_users():
@@ -46,7 +44,7 @@ async def cmd_status(msg: Message):
     uid = msg.from_user.id
     pairs = [k.split("_")[1] for k in active_monitors if k.startswith(f"{uid}_")]
     if pairs:
-        await msg.answer("Monitored:" + "\n".join(pairs))
+        await msg.answer("Monitored:\n" + "\n".join(pairs))
     else:
         await msg.answer("No pairs monitored.")
 
@@ -79,7 +77,7 @@ async def auto_update_and_restart():
             print("Update detected. Restarting bot...")
             await bot.session.close()
             os.execv(sys.executable, ['python'] + sys.argv)
-        await asyncio.sleep(1)  # Check every 1 second
+        await asyncio.sleep(1)
 
 async def main():
     asyncio.create_task(auto_update_and_restart())

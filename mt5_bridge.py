@@ -12,14 +12,9 @@ def fetch_mt5_candles(symbol, interval):
     data = mt5.copy_rates_from_pos(symbol, tf, 0, count)
     mt5.shutdown()
 
-    candles = []
-    for r in reversed(data):
-        candles.append({
-            "datetime": datetime.utcfromtimestamp(r['time']).strftime("%Y-%m-%d %H:%M:%S"),
-            "open": r['open'],
-            "high": r['high'],
-            "low": r['low'],
-            "close": r['close'],
-            "volume": r['tick_volume']
-        })
-    return candles
+    return [{
+        "datetime": datetime.utcfromtimestamp(r['time']).strftime("%Y-%m-%d %H:%M:%S"),
+        "open": r['open'], "high": r['high'],
+        "low": r['low'], "close": r['close'],
+        "volume": r['tick_volume']
+    } for r in reversed(data)]
