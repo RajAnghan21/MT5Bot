@@ -44,7 +44,7 @@ async def cmd_status(msg: Message):
     uid = msg.from_user.id
     pairs = [k.split("_")[1] for k in active_monitors if k.startswith(f"{uid}_")]
     if pairs:
-        await msg.answer("Monitored:\n" + "\n".join(pairs))
+        await msg.answer("Monitored:" + "".join(pairs))
     else:
         await msg.answer("No pairs monitored.")
 
@@ -54,7 +54,7 @@ async def photo_command(msg: Message):
 
 @dp.message(F.photo)
 async def photo_received(msg: Message):
-    await handle_photo(msg)
+    await handle_photo(msg, bot)
 
 @dp.callback_query(F.data.in_(["photo_add", "photo_cancel"]))
 async def photo_response(cb: Message):
