@@ -33,8 +33,7 @@ async def handle_photo(message: types.Message, bot):
         [InlineKeyboardButton("Add", callback_data="photo_add"),
          InlineKeyboardButton("Cancel", callback_data="photo_cancel")]
     ])
-    await message.answer("Detected pairs:
-" + "\n".join(pairs), reply_markup=markup)
+    await message.answer("Detected pairs:\n" + "\n".join(pairs), reply_markup=markup)
 
 async def handle_photo_action(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -42,7 +41,6 @@ async def handle_photo_action(callback: types.CallbackQuery):
         pairs = user_pending_photos.pop(user_id, [])
         for p in pairs:
             await monitor_pair(callback.bot, user_id, p)
-        await callback.message.edit_text("Now monitoring:
-" + "\n".join(pairs))
+        await callback.message.edit_text("Now monitoring:\n" + "\n".join(pairs))
     else:
         await callback.message.edit_text("Cancelled.")
