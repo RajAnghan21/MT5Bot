@@ -1,4 +1,4 @@
-import asyncio, json, os, sys, subprocess
+import asyncio, json, os
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ParseMode
 from aiogram.types import Message
@@ -22,7 +22,7 @@ async def cmd_start(msg: Message):
 async def cmd_available(msg: Message):
     if msg.from_user.id not in load_users():
         return await msg.answer("Not allowed.")
-    await msg.answer("Send one or more pairs (comma-separated), e.g.: EURUSD, GBPJPY")
+    await msg.answer("Send one or more pairs (comma-separated), e.g.: EURUSDm, GBPJPYm")
 
 @dp.message(Command("clear"))
 async def cmd_clear(msg: Message):
@@ -44,7 +44,7 @@ async def cmd_status(msg: Message):
     uid = msg.from_user.id
     pairs = [k.split("_")[1] for k in active_monitors if k.startswith(f"{uid}_")]
     if pairs:
-        await msg.answer("Monitored:" + "".join(pairs))
+        await msg.answer("Monitored:" + "\n".join(pairs))
     else:
         await msg.answer("No pairs monitored.")
 
@@ -65,22 +65,12 @@ async def handle_pair_input(msg: Message):
     uid = msg.from_user.id
     if uid not in load_users():
         return await msg.answer("Not allowed.")
-    pairs = [p.strip().upper() for p in msg.text.split(",") if p.strip()]
+    pairs = [p.strip().upper().replace("/", "") for p in msg.text.split(",") if p.strip()]
     for pair in pairs:
         await msg.answer(f"Monitoring {pair}...")
         asyncio.create_task(monitor_pair(bot, uid, pair))
 
-async def auto_update_and_restart():
-    while True:
-        process = subprocess.run(["git", "pull"], capture_output=True, text=True)
-        if "Already up to date" not in process.stdout:
-            print("Update detected. Restarting bot...")
-            await bot.session.close()
-            os.execv(sys.executable, ['python'] + sys.argv)
-        await asyncio.sleep(1)
-
 async def main():
-    asyncio.create_task(auto_update_and_restart())
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
