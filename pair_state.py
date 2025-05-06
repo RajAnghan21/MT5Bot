@@ -11,6 +11,7 @@ def log(pair, msg):
         print(f"[{datetime.utcnow()}] [{pair}] {msg}")
 
 async def monitor_pair(bot, chat_id, pair):
+    pair = pair.replace("/", "")  # sanitize pair name
     monitor_id = f"{chat_id}_{pair}"
     if monitor_id in active_monitors:
         return

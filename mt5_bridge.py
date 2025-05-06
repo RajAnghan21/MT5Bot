@@ -1,6 +1,5 @@
 import MetaTrader5 as mt5
 from datetime import datetime
-from config import MT5_LOGIN, MT5_PASSWORD, MT5_SERVER
 
 def fetch_mt5_candles(symbol, interval):
     if not mt5.initialize():
@@ -11,6 +10,10 @@ def fetch_mt5_candles(symbol, interval):
     count = 30 if interval == "1min" else 50
     data = mt5.copy_rates_from_pos(symbol, tf, 0, count)
     mt5.shutdown()
+
+    if data is None:
+        print(f"[{symbol}] ⚠️ No candle data returned from MT5.")
+        return []
 
     return [{
         "datetime": datetime.utcfromtimestamp(r['time']).strftime("%Y-%m-%d %H:%M:%S"),
