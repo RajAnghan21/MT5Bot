@@ -14,7 +14,7 @@ def log(pair, msg):
 
 async def monitor_pair(bot, chat_id, pair):
     global last_global_signal_time
-    pair = pair.replace("/", "")
+    pair = pair.replace("/", "") + "m"
     monitor_id = f"{chat_id}_{pair}"
     if monitor_id in active_monitors:
         return
