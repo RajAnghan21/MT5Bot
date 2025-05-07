@@ -6,6 +6,7 @@ from mt5_bridge import fetch_mt5_candles
 
 active_monitors = {}
 last_global_signal_time = None
+cooldown_lock = asyncio.Lock()
 
 def log(pair, msg):
     if LOG_TO_TERMINAL:
@@ -13,7 +14,7 @@ def log(pair, msg):
 
 async def monitor_pair(bot, chat_id, pair):
     global last_global_signal_time
-    pair = pair.replace("/", "") + "m"
+    pair = pair.replace("/", "")
     monitor_id = f"{chat_id}_{pair}"
     if monitor_id in active_monitors:
         return
@@ -53,30 +54,30 @@ async def monitor_pair(bot, chat_id, pair):
                 await asyncio.sleep(2)
                 continue
 
-            # Global cooldown check
-            if last_global_signal_time and datetime.utcnow() < last_global_signal_time + timedelta(minutes=4):
-                log(pair, f"⏸ Global cooldown active until {(last_global_signal_time + timedelta(minutes=4)).strftime('%H:%M:%S')}")
-                break
+            async with cooldown_lock:
+                if last_global_signal_time and datetime.utcnow() < last_global_signal_time + timedelta(minutes=4):
+                    log(pair, f"⏸ Global cooldown active until {(last_global_signal_time + timedelta(minutes=4)).strftime('%H:%M:%S')}")
+                    break
 
-            log(pair, f"Checked 1m close={close:.5f} at {candle_time}")
+                log(pair, f"Checked 1m close={close:.5f} at {candle_time}")
 
-            if trend == "up" and close < low:
-                log(pair, f"❌ Invalidated: Trend UP but close < low")
-                break
-            elif trend == "down" and close > high:
-                log(pair, f"❌ Invalidated: Trend DOWN but close > high")
-                break
+                if trend == "up" and close < low:
+                    log(pair, f"❌ Invalidated: Trend UP but close < low")
+                    break
+                elif trend == "down" and close > high:
+                    log(pair, f"❌ Invalidated: Trend DOWN but close > high")
+                    break
 
-            if trend == "up" and close > high:
-                log(pair, f"✅ SELL Signal at {close:.5f}")
-                await send_trade_alert(bot, chat_id, pair, "SELL", close)
-                last_global_signal_time = datetime.utcnow()
-                break
-            elif trend == "down" and close < low:
-                log(pair, f"✅ BUY Signal at {close:.5f}")
-                await send_trade_alert(bot, chat_id, pair, "BUY", close)
-                last_global_signal_time = datetime.utcnow()
-                break
+                if trend == "up" and close > high:
+                    log(pair, f"✅ SELL Signal at {close:.5f}")
+                    await send_trade_alert(bot, chat_id, pair, "SELL", close)
+                    last_global_signal_time = datetime.utcnow()
+                    break
+                elif trend == "down" and close < low:
+                    log(pair, f"✅ BUY Signal at {close:.5f}")
+                    await send_trade_alert(bot, chat_id, pair, "BUY", close)
+                    last_global_signal_time = datetime.utcnow()
+                    break
 
             log(pair, f"Skipped: No breakout")
             await asyncio.sleep(5)
