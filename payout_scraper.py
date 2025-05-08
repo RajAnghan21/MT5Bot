@@ -33,7 +33,7 @@ def parse_payouts(html):
 
             try:
                 payout = int(payout_text)
-                if 75 <= payout <= 95 and '/' in pair and 'OTC' not in pair.upper():
+                if 85 <= payout <= 95 and '/' in pair and 'OTC' not in pair.upper():
                     valid_pairs.append(pair)
             except ValueError:
                 continue
