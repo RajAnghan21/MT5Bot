@@ -8,6 +8,7 @@ active_monitors = {}
 monitor_tasks = {}  # Needed for /clear and /remove
 last_global_signal_time = None
 cooldown_lock = asyncio.Lock()
+subscribed_users = set()  # Track users who activated via /startbot
 
 def log(pair, msg):
     if LOG_TO_TERMINAL:
@@ -15,7 +16,6 @@ def log(pair, msg):
 
 async def monitor_pair(bot, chat_id, pair):
     global last_global_signal_time
-    pair = pair.replace("/", "") +"m"
     monitor_id = f"{chat_id}_{pair}"
     if monitor_id in active_monitors:
         return
@@ -26,7 +26,8 @@ async def monitor_pair(bot, chat_id, pair):
 
     try:
         while True:
-            candles_5m = fetch_mt5_candles(pair, "5min")
+            mt5_pair = pair + "m"
+            candles_5m = fetch_mt5_candles(mt5_pair, "5min")
             if not candles_5m or len(candles_5m) < EMA_PERIOD:
                 await asyncio.sleep(5)
                 continue
@@ -42,7 +43,7 @@ async def monitor_pair(bot, chat_id, pair):
             log(pair, f"5m Setup: Time={current_5m_time}, Trend={trend}, High={high}, Low={low}, EMA={ema:.5f}")
 
             while True:
-                candles_1m = fetch_mt5_candles(pair, "1min")
+                candles_1m = fetch_mt5_candles(mt5_pair, "1min")
                 if not candles_1m:
                     await asyncio.sleep(5)
                     continue
@@ -73,12 +74,14 @@ async def monitor_pair(bot, chat_id, pair):
 
                     if trend == "up" and close > high:
                         log(pair, f"✅ SELL Signal at {close:.5f}")
-                        await send_trade_alert(bot, chat_id, pair, "SELL", close)
+                        for user_id in subscribed_users:
+                            await send_trade_alert(bot, user_id, pair, "SELL", close)
                         last_global_signal_time = datetime.utcnow()
                         break
                     elif trend == "down" and close < low:
                         log(pair, f"✅ BUY Signal at {close:.5f}")
-                        await send_trade_alert(bot, chat_id, pair, "BUY", close)
+                        for user_id in subscribed_users:
+                            await send_trade_alert(bot, user_id, pair, "BUY", close)
                         last_global_signal_time = datetime.utcnow()
                         break
 

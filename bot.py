@@ -4,9 +4,8 @@ from aiogram.enums import ParseMode
 from aiogram.types import Message
 from aiogram.filters import Command
 from config import TELEGRAM_BOT_TOKEN, ALLOWED_USERS_FILE
-from pair_state import monitor_pair, active_monitors, monitor_tasks
-from photo_handler import ask_for_photo, handle_photo, handle_photo_action
-from payout_scraper import fetch_payouts  # or use payout_scraper_debug for debugging
+from pair_state import monitor_pair, active_monitors, monitor_tasks, subscribed_users
+from payout_scraper import fetch_payouts
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
@@ -25,16 +24,18 @@ async def payout_monitor_task():
 
             for pair in valid_pairs:
                 clean_pair = pair.replace("/", "")
-                for uid in load_users():
-                    monitor_id = f"{uid}_{clean_pair}"
-                    if monitor_id not in active_monitors:
-                        print(f"[PAYOUT] Adding {monitor_id}")
-                        asyncio.create_task(monitor_pair(bot, uid, clean_pair))
+                monitor_id = f"global_{clean_pair}"
+                if monitor_id not in active_monitors:
+                    print(f"[PAYOUT] Adding {monitor_id}")
+                    active_monitors[monitor_id] = True
+                    asyncio.create_task(monitor_pair(bot, "global", clean_pair))
 
             for monitor_id in list(active_monitors):
+                if not monitor_id.startswith("global_"):
+                    continue
                 pair_code = monitor_id.split("_")[1]
-                pair_fmt = pair_code[:3] + "/" + pair_code[3:]
-                if pair_fmt not in valid_pairs:
+                reconstructed = pair_code[:3] + "/" + pair_code[3:]
+                if reconstructed not in valid_pairs:
                     print(f"[PAYOUT] Removing {monitor_id}")
                     if monitor_id in monitor_tasks:
                         monitor_tasks[monitor_id].cancel()
@@ -46,93 +47,105 @@ async def payout_monitor_task():
 
 @dp.message(Command("start"))
 async def cmd_start(msg: Message):
-    await msg.answer("Welcome! Use /available, /status, /clear, /usage, /photos, /remove.")
+    await msg.answer(
+    "👋 Hello, Trader!\n\n"
+    "Welcome to the FX Signal Bot — your personal assistant for identifying high-potential forex trade opportunities.\n\n"
+    "Use the following commands to get started:\n"
+    "/startbot – Begin receiving live trade alerts\n"
+    "/stopbot – Stop receiving alerts anytime\n"
+    "/status – See your current signal status\n"
+    "/pairs – View active analyzing pairs\n"
+    "/help – Show all available commands\n\n"
+    "💡 *Risk Management Tip:*\n"
+    "Never risk more than 1–2% of your capital per trade. Consistency and discipline are key to long-term success.\n\n"
+    "Wishing you confident and informed trading! 📈💼"
+)
 
-@dp.message(Command("available"))
-async def cmd_available(msg: Message):
-    if msg.from_user.id not in load_users():
-        return await msg.answer("Not allowed.")
-    await msg.answer("Send one or more pairs (comma-separated), e.g.: EUR/USD, GBP/JPY")
 
-@dp.message(Command("clear"))
-async def cmd_clear(msg: Message):
+@dp.message(Command("startbot"))
+async def cmd_startbot(msg: Message):
     uid = msg.from_user.id
-    keys = [k for k in active_monitors if k.startswith(f"{uid}_")]
-    for k in keys:
-        if k in monitor_tasks:
-            monitor_tasks[k].cancel()
-        active_monitors.pop(k, None)
-        monitor_tasks.pop(k, None)
-    await msg.answer("All monitoring sessions cleared.")
+    if uid not in load_users():
+        return await msg.answer("❌ Not allowed.")
+    subscribed_users.add(uid)
+    await msg.answer("✅ You will now receive trade signals.")
 
-@dp.message(Command("remove"))
-async def cmd_remove(msg: Message):
+@dp.message(Command("stopbot"))
+async def cmd_stopbot(msg: Message):
     uid = msg.from_user.id
-    parts = msg.text.split(maxsplit=1)
-    if len(parts) != 2:
-        return await msg.answer("Usage:\n/remove EUR/USD, GBP/USD")
-
-    removed = []
-    failed = []
-    for raw in parts[1].split(","):
-        pair = raw.strip().upper().replace("/", "")
-        monitor_id = f"{uid}_{pair}"
-
-        if monitor_id in monitor_tasks:
-            monitor_tasks[monitor_id].cancel()
-            monitor_tasks.pop(monitor_id, None)
-            active_monitors.pop(monitor_id, None)
-            removed.append(pair)
-        else:
-            failed.append(pair)
-
-    reply = ""
-    if removed:
-        reply += "✅ Removed:\n" + "\n".join(removed)
-    if failed:
-        reply += "\n❌ Not Monitored:\n" + "\n".join(failed)
-
-    await msg.answer(reply.strip())
-
-@dp.message(Command("usage"))
-async def cmd_usage(msg: Message):
-    try:
-        with open("api_usage.txt") as f:
-            count = f.read().strip()
-    except:
-        count = "0"
-    await msg.answer(f"API Calls: {count}")
+    subscribed_users.discard(uid)
+    await msg.answer("⛔ You will no longer receive trade signals.")
 
 @dp.message(Command("status"))
 async def cmd_status(msg: Message):
     uid = msg.from_user.id
-    pairs = [k.split("_")[1] for k in active_monitors if k.startswith(f"{uid}_")]
-    if pairs:
-        await msg.answer("Monitored:\n" + "\n".join(pairs))
+    if uid in subscribed_users:
+        await msg.answer("🔔 You are subscribed to receive signals.")
     else:
-        await msg.answer("No pairs monitored.")
+        await msg.answer("🔕 You are not receiving signals. Use /startbot to subscribe.")
 
-@dp.message(Command("photos"))
-async def photo_command(msg: Message):
-    await ask_for_photo(msg)
+@dp.message(Command("pairs"))
+async def cmd_pairs(msg: Message):
+    global_pairs = [k.split("_")[1] for k in active_monitors if k.startswith("global_")]
+    if not global_pairs:
+        await msg.answer("🔍 No pairs are currently being analyzed.")
+    else:
+        await msg.answer("📡 Currently analyzing:" + "\n".join(global_pairs))
 
-@dp.message(F.photo)
-async def photo_received(msg: Message):
-    await handle_photo(msg, bot)
+@dp.message(Command("help"))
+async def cmd_help(msg: Message):
+    help_text = (
+        "🤖 *Available Commands:*\n"
+        "/startbot - Start receiving signals\n"
+        "/stopbot - Stop receiving signals\n"
+        "/status - Check subscription status\n"
+        "/pairs - View active analyzing pairs"
+    )
+    await msg.answer(help_text, parse_mode=ParseMode.MARKDOWN)
 
-@dp.callback_query(F.data.in_(["photo_add", "photo_cancel"]))
-async def photo_response(cb: Message):
-    await handle_photo_action(cb)
+@dp.message(Command("allow"))
+async def cmd_allow(msg: Message):
+    if msg.from_user.id != 777715557:
+        return await msg.answer("❌ Not authorized.")
+    parts = msg.text.split()
+    if len(parts) != 2 or not parts[1].isdigit():
+        return await msg.answer("Usage: /allow <user_id>")
+    user_id = int(parts[1])
+    users = load_users()
+    if user_id not in users:
+        users.append(user_id)
+        with open(ALLOWED_USERS_FILE, "w") as f:
+            json.dump(users, f)
+        await msg.answer(f"✅ Allowed user {user_id}")
+    else:
+        await msg.answer(f"⚠️ User {user_id} already allowed.")
 
-@dp.message(F.text)
-async def handle_pair_input(msg: Message):
-    uid = msg.from_user.id
-    if uid not in load_users():
-        return await msg.answer("Not allowed.")
-    pairs = [p.strip().upper().replace("/", "") for p in msg.text.split(",") if p.strip()]
-    for pair in pairs:
-        await msg.answer(f"Monitoring {pair}...")
-        asyncio.create_task(monitor_pair(bot, uid, pair))
+@dp.message(Command("block"))
+async def cmd_block(msg: Message):
+    if msg.from_user.id != 777715557:
+        return await msg.answer("❌ Not authorized.")
+    parts = msg.text.split()
+    if len(parts) != 2 or not parts[1].isdigit():
+        return await msg.answer("Usage: /block <user_id>")
+    user_id = int(parts[1])
+    users = load_users()
+    if user_id in users:
+        users.remove(user_id)
+        with open(ALLOWED_USERS_FILE, "w") as f:
+            json.dump(users, f)
+        await msg.answer(f"⛔ Blocked user {user_id}")
+    else:
+        await msg.answer(f"⚠️ User {user_id} is not in the list.")
+
+@dp.message(Command("users"))
+async def cmd_users(msg: Message):
+    if msg.from_user.id != 777715557:
+        return await msg.answer("❌ Not authorized.")
+    users = load_users()
+    if users:
+        await msg.answer("👥 Allowed Users:" + "\n".join(map(str, users)))
+    else:
+        await msg.answer("⚠️ No users currently allowed.")
 
 async def main():
     asyncio.create_task(payout_monitor_task())
@@ -140,3 +153,19 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+@dp.message(Command("start"))
+async def cmd_start(msg: Message):
+    await msg.answer(
+        "👋 Hello, Trader!\n\n"
+        "Welcome to the FX Signal Bot — your personal assistant for identifying high-potential forex trade opportunities.\n\n"
+        "Use the following commands to get started:\n"
+        "/startbot – Begin receiving live trade alerts\n"
+        "/stopbot – Stop receiving alerts anytime\n"
+        "/status – See your current signal status\n"
+        "/pairs – View active analyzing pairs\n"
+        "/help – Show all available commands\n\n"
+        "💡 *Risk Management Tip:*\n"
+        "Never risk more than 1–2% of your capital per trade. Consistency and discipline are key to long-term success.\n\n"
+        "Wishing you confident and informed trading! 📈💼"
+    )
