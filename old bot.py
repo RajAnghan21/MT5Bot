@@ -6,7 +6,6 @@ from aiogram.filters import Command
 from config import TELEGRAM_BOT_TOKEN, ALLOWED_USERS_FILE
 from pair_state import monitor_pair, active_monitors, monitor_tasks
 from photo_handler import ask_for_photo, handle_photo, handle_photo_action
-from payout_scraper import fetch_payouts  # or use payout_scraper_debug for debugging
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
@@ -14,35 +13,6 @@ dp = Dispatcher()
 def load_users():
     with open(ALLOWED_USERS_FILE) as f:
         return json.load(f)
-
-async def payout_monitor_task():
-    await asyncio.sleep(5)
-    print("[PAYOUT] Auto payout monitor started.")
-    while True:
-        try:
-            valid_pairs = await fetch_payouts()
-            print("[PAYOUT] Live pairs:", valid_pairs)
-
-            for pair in valid_pairs:
-                clean_pair = pair.replace("/", "")
-                for uid in load_users():
-                    monitor_id = f"{uid}_{clean_pair}"
-                    if monitor_id not in active_monitors:
-                        print(f"[PAYOUT] Adding {monitor_id}")
-                        asyncio.create_task(monitor_pair(bot, uid, clean_pair))
-
-            for monitor_id in list(active_monitors):
-                pair_code = monitor_id.split("_")[1]
-                pair_fmt = pair_code[:3] + "/" + pair_code[3:]
-                if pair_fmt not in valid_pairs:
-                    print(f"[PAYOUT] Removing {monitor_id}")
-                    if monitor_id in monitor_tasks:
-                        monitor_tasks[monitor_id].cancel()
-                        monitor_tasks.pop(monitor_id, None)
-                    active_monitors.pop(monitor_id, None)
-        except Exception as e:
-            print(f"[PAYOUT] Monitor error: {e}")
-        await asyncio.sleep(60)
 
 @dp.message(Command("start"))
 async def cmd_start(msg: Message):
@@ -75,7 +45,7 @@ async def cmd_remove(msg: Message):
     removed = []
     failed = []
     for raw in parts[1].split(","):
-        pair = raw.strip().upper().replace("/", "")
+        pair = raw.strip().upper().replace("/", "") + "m"
         monitor_id = f"{uid}_{pair}"
 
         if monitor_id in monitor_tasks:
@@ -135,7 +105,6 @@ async def handle_pair_input(msg: Message):
         asyncio.create_task(monitor_pair(bot, uid, pair))
 
 async def main():
-    asyncio.create_task(payout_monitor_task())
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
