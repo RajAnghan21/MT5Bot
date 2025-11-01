@@ -3,3 +3,5 @@ MetaTrader5
 playwright
 beautifulsoup4
 lxml
+
+test git
